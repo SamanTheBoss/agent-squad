@@ -192,6 +192,16 @@ feat(dashboard): user sees their recent activity
 - Commit dead code
 - Batch unrelated changes
 
+## SHUTDOWN
+After sending completion report → make no further tool calls.
+Do not check task lists.
+Do not look for more work.
+Do not review your own code.
+Do not run tests again.
+The lead will trigger review.
+
+Your job is done when you send the report.
+
 ## DONE
 
 Update context/execution-plan.md:
