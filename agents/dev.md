@@ -238,3 +238,6 @@ Next tasks unblocked by this completion:
 - Proceed with missing dependencies
 - Write logic in UI components
 - Import directly from inside another feature
+- Continue after reporting — always shutdown immediately
+- Check for more tasks after completion
+- Review your own work after reporting
