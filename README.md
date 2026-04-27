@@ -22,27 +22,36 @@ We solve it differently:
 - No agent does more than one job
 - Contracts are defined before code is written
 - Tests are written before dev starts
+- Every output is independently verified
 
 ---
 
 ## The pipeline
- 
-![Agent Squad Pipeline](assets/pipeline.png)
- 
+
+![Agent Squad Pipeline](assets/pipeline.svg)
+
 ```
 /agent-requirements
         ↓
 /agent-design (skip for backend/cli)
         ↓
-/agent-integration ──── parallel ──── /agent-qa phase=1
-        ↓                                      ↓
+/agent-explorer ──── parallel ──── /agent-integration
+        ↓                                  ↓
+        └──────── /agent-qa phase=1 ───────┘
+                          ↓
 /agent-dev task=[T-id] (one per task, parallel groups)
-        ↓
-/agent-qa phase=2
-        ↓
-/agent-mutation
+                          ↓
+              spec-review → fail → /agent-fixer → re-review (max 2x)
+                          ↓
+          quality-review → fail → /agent-fixer → re-review (max 2x)
+                          ↓
+              /agent-qa phase=2
+                          ↓
+        /agent-mutation → fail → /agent-fixer → re-run
+                          ↓
+                       ✅ Done
 ```
- 
+
 ---
 
 ## Agents
@@ -50,11 +59,13 @@ We solve it differently:
 | Agent | Job | Output |
 |-------|-----|--------|
 | requirements | Interview user, produce spec | context/ files |
-| design | Build design system + Storybook | src/tokens, src/components |
-| integration | Define contracts + execution plan | contracts.md, execution-plan.md |
-| qa | Write tests + verify quality | tests/, manual-tests/, qa-report.md |
+| design | Build design system + Storybook | src/tokens, src/components, context/design-system.md |
+| explorer | Scan codebase, report patterns and conflicts | context/explorer-report.md |
+| integration | Define contracts + execution plan | context/contracts.md, context/execution-plan.md |
+| qa | Write tests + verify quality (2 phases) | context/tests/, context/manual-tests/, context/qa-report.md |
 | dev | Implement one task against contracts | feature code |
-| mutation | Verify tests catch real bugs | mutation-report.md |
+| fixer | Fix review and mutation failures | updated code or tests |
+| mutation | Verify tests catch real bugs | context/mutation-report.md |
 
 ---
 
@@ -69,20 +80,29 @@ We solve it differently:
 
 ## Quick start
 
-### 1. Copy agents to your project
+### 1. Enable agent teams in Claude Code
+```json
+// ~/.claude/settings.json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+### 2. Copy agents to your project
 ```bash
 cp -r agents/ your-project/.claude/agents/
 cp -r integrations/claude-code/ your-project/.claude/commands/
 ```
 
-### 2. Run requirements agent
+### 3. Run requirements agent
 ```
 /agent-requirements
 ```
 
-### 3. Follow the pipeline
-The requirements agent tells you what to run next.
-Each agent tells you what to run after it.
+### 4. Follow the pipeline
+Each agent tells you what to run next.
 
 ---
 
@@ -93,31 +113,55 @@ Never edit these manually — they are agent outputs.
 
 ```
 context/
-  project.md          ← project profile
-  features.md         ← feature specs
-  design.md           ← design requirements
-  technical.md        ← tech decisions
-  test-criteria.md    ← test scenarios
-  roadmap.md          ← deferred features
-  open-questions.md   ← unresolved questions
-  contracts.md        ← interfaces and schemas
-  execution-plan.md   ← task ordering
-  design-system.md    ← available components
-  tests/              ← automated tests
-  manual-tests/       ← manual test scenarios
-  qa-report.md        ← QA summary
-  mutation-report.md  ← mutation testing results
+  project.md            ← project profile (requirements)
+  features.md           ← feature specs (requirements)
+  design.md             ← design requirements (requirements)
+  technical.md          ← tech decisions (requirements)
+  test-criteria.md      ← test scenarios (requirements)
+  roadmap.md            ← deferred features (requirements)
+  open-questions.md     ← unresolved questions (requirements)
+  explorer-report.md    ← codebase analysis (explorer)
+  contracts.md          ← interfaces and schemas (integration)
+  execution-plan.md     ← task ordering (integration)
+  design-system.md      ← available components (design)
+  tests/                ← automated tests (qa phase 1)
+  manual-tests/         ← manual test scenarios (qa phase 1)
+  reviews/              ← spec and quality review reports
+  qa-report.md          ← QA summary (qa phase 2)
+  mutation-report.md    ← mutation testing results (mutation)
 ```
 
 ---
 
+## How we differ from SpecOps
+
+![Comparison](assets/comparison.png)
+
+| | agent-squad | SpecOps |
+|---|---|---|
+| Design system | ✅ Full Storybook boilerplate | ❌ None |
+| Contracts before code | ✅ Integration agent | ❌ None |
+| Explorer | ✅ + tech debt + security flags | ✅ Basic |
+| Mutation testing | ✅ Dedicated agent | ❌ None |
+| Manual tests | ✅ Categorized by project type | ❌ None |
+| Fixer agent | ✅ 3 modes (spec/quality/mutation) | ✅ Basic |
+| Language support | ✅ Any language | TS/JS only |
+| Backend/CLI projects | ✅ Skips design automatically | ❌ Always runs design |
+| Scope protection | ✅ MoSCoW + roadmap | ❌ None |
+| Token philosophy | Minimal context per agent | High token usage |
+
+---
+
 ## Philosophy
+
+![Token Philosophy](assets/token-philosophy.png)
 
 **Spec first.** Nothing gets built without a spec.
 **Contracts before code.** Dev agents never guess interfaces.
 **Tests before dev.** QA writes tests before dev starts.
 **One job per agent.** No agent does more than it should.
 **Minimal context.** Every agent reads only what it needs.
+**Independent verification.** Never trust self-reports.
 **No shortcuts.** Code standards are non-negotiable.
 
 ---
@@ -125,7 +169,6 @@ context/
 ## Supported languages
 
 Agents adapt to your language and framework.
-Code standards and design standards cover:
 
 - TypeScript / JavaScript (React, Next.js, Node.js)
 - C# (.NET, ASP.NET)
@@ -142,8 +185,9 @@ Code standards and design standards cover:
 This project is in active development.
 Contributions welcome — especially:
 - New language-specific standards
-- Integrations for other AI coding tools (Cursor, Windsurf)
+- Integrations for Cursor, Windsurf, and other AI coding tools
 - Improvements to existing agents
+- Real-world usage reports and bug fixes
 
 ---
 
